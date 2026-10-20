@@ -53,6 +53,7 @@ import ShowMessage
 import SlideShow
 import SpecialNotes as SN
 import SpecialNotesGui as SNG
+import TDict
 import TSet
 import TagAThing
 import TagFiles
@@ -65,6 +66,7 @@ import Url exposing (Url)
 import UserSettings
 import Util exposing (andMap)
 import View
+import WebSocket
 import WindowKeys
 import ZkCommon exposing (StylePalette)
 
@@ -93,6 +95,7 @@ type Msg
     | TauriAdminReplyData JD.Value
     | TauriPublicReplyData JD.Value
     | TauriTauriReplyData JD.Value
+    | ReceiveSocketMsg JD.Value
     | LoadUrl String
     | InternalUrl Url
     | TASelection JD.Value
@@ -174,6 +177,7 @@ decodeFlags =
         |> andMap (JD.field "login" (JD.maybe DataUtil.decodeLoginData))
         |> andMap (JD.field "adminsettings" OD.adminSettingsDecoder)
         |> andMap (JD.field "tauri" JD.bool)
+        |> andMap (JD.field "websockets" JD.bool)
         |> andMap (JD.field "mobile" JD.bool)
 
 
@@ -189,6 +193,7 @@ type alias Flags =
     , login : Maybe DataUtil.LoginData
     , adminsettings : OD.AdminSettings
     , tauri : Bool
+    , websockets : Bool
     , mobile : Bool
     }
 
@@ -208,8 +213,31 @@ type LocalValAction
     = LocalValAction
         { for : String
         , name : String
-        , action : Maybe String -> ( Model, Cmd Msg )
+        , action : Model -> Maybe String -> ( Model, Cmd Msg )
         }
+
+
+type SocketState
+    = SsOpenRequested
+    | SsIsOpen
+    | SsIsClosed WebSocket.SocketClosure
+    | SsError
+
+
+opensocket : String -> Cmd Msg
+opensocket location =
+    sendSocketCommand
+        (WebSocket.encodeCmd <|
+            WebSocket.Connect
+                { name = "private"
+                , address =
+                    location
+                        -- http -> ws, https -> wss
+                        |> String.replace "http" "ws"
+                        |> (\s -> s ++ "/privatews")
+                , protocol = ""
+                }
+        )
 
 
 type alias Model =
@@ -233,8 +261,9 @@ type alias Model =
     , ziClosures : Dict Int (Result Http.Error ( Time.Posix, Data.PrivateReply ) -> Msg)
     , mobile : Bool
     , spmodel : SP.Model
-    , localValAction : Maybe LocalValAction
+    , localValAction : Dict String LocalValAction
     , zknSearchResult : Data.ZkListNoteSearchResult
+    , socketState : Maybe SocketState
     }
 
 
@@ -869,6 +898,9 @@ showMessage msg =
         TauriTauriReplyData _ ->
             "TauriTauriReplyData"
 
+        ReceiveSocketMsg _ ->
+            "ReceiveSocketMsg"
+
         SelectDialogMsg _ ->
             "SelectDialogMsg"
 
@@ -1381,6 +1413,17 @@ sendZIMsg fui msg =
     if fui.tauri then
         sendZIMsgTauri <| PrivateClosureRequest Nothing msg
 
+    else if fui.websockets then
+        sendSocketCommand
+            (WebSocket.encodeCmd <|
+                WebSocket.Send
+                    { name = "private"
+                    , content =
+                        JE.encode 0
+                            (Data.privateClosureRequestEncoder (PrivateClosureRequest Nothing msg))
+                    }
+            )
+
     else
         HE.postJsonTask
             { url = fui.location ++ "/private"
@@ -1591,94 +1634,128 @@ view model =
             _ ->
                 routeTitle model.savedRoute.route
     , body =
-        [ case model.state of
-            DisplayMessage dm _ ->
-                Html.map DisplayMessageMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                        dm
+        (case model.socketState of
+            Nothing ->
+                []
 
-            MessageNLink dm _ ->
-                Html.map MessageNLinkMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                        dm
+            Just ss ->
+                case ss of
+                    SsOpenRequested ->
+                        [ Html.text "connecting websocket" ]
 
-            SelectDialog sdm _ ->
-                if model.mobile then
-                    E.layout [] <|
-                        E.map SelectDialogMsg <|
-                            GD.dialogView Nothing sdm
+                    SsIsOpen ->
+                        []
 
-                else
-                    Html.map SelectDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            sdm
+                    SsIsClosed WebSocket.PolicyViolation ->
+                        []
 
-            ChangePasswordDialog cdm _ ->
-                Html.map ChangePasswordDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                        cdm
+                    SsIsClosed sc ->
+                        [ Html.div []
+                            [ Html.div []
+                                [ Html.text <|
+                                    "websocket closed with code: "
+                                        ++ (String.fromInt <| WebSocket.socketClosureCode sc)
+                                        ++ " string: "
+                                        ++ WebSocket.showSocketClosure sc
+                                ]
+                            , Html.div []
+                                [ Html.text
+                                    "reconnecting..."
+                                ]
+                            ]
+                        ]
 
-            ChangeEmailDialog cdm _ ->
-                Html.map ChangeEmailDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                        cdm
+                    SsError ->
+                        [ Html.text <| "websocket error" ]
+        )
+            ++ [ case model.state of
+                    DisplayMessage dm _ ->
+                        Html.map DisplayMessageMsg <|
+                            GD.layout
+                                (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                dm
 
-            ChangeRemoteUrlDialog cdm _ ->
-                Html.map ChangeRemoteUrlDialogMsg <|
-                    GD.layout
-                        (Just { width = min 600 model.size.width, height = min 200 model.size.height })
-                        cdm
+                    MessageNLink dm _ ->
+                        Html.map MessageNLinkMsg <|
+                            GD.layout
+                                (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                dm
 
-            JobsDialog dm _ ->
-                if model.mobile then
-                    E.layout [] <|
-                        E.map JobsDialogMsg <|
-                            GD.dialogView Nothing { dm | model = model.jobs }
+                    SelectDialog sdm _ ->
+                        if model.mobile then
+                            E.layout [] <|
+                                E.map SelectDialogMsg <|
+                                    GD.dialogView Nothing sdm
 
-                else
-                    Html.map JobsDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            { dm | model = model.jobs }
+                        else
+                            Html.map SelectDialogMsg <|
+                                GD.layout
+                                    (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                    sdm
 
-            MdInlineXform gdm _ ->
-                if model.mobile then
-                    E.layout [] <|
-                        E.map MdInlineXformMsg <|
-                            GD.dialogView Nothing gdm
+                    ChangePasswordDialog cdm _ ->
+                        Html.map ChangePasswordDialogMsg <|
+                            GD.layout
+                                (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                                cdm
 
-                else
-                    Html.map MdInlineXformMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            gdm
+                    ChangeEmailDialog cdm _ ->
+                        Html.map ChangeEmailDialogMsg <|
+                            GD.layout
+                                (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                                cdm
 
-            RequestsDialog dm _ ->
-                if model.mobile then
-                    E.layout [] <|
-                        E.map RequestsDialogMsg <|
-                            GD.dialogView Nothing { dm | model = model.trackedRequests }
+                    ChangeRemoteUrlDialog cdm _ ->
+                        Html.map ChangeRemoteUrlDialogMsg <|
+                            GD.layout
+                                (Just { width = min 600 model.size.width, height = min 200 model.size.height })
+                                cdm
 
-                else
-                    Html.map RequestsDialogMsg <|
-                        GD.layout
-                            (Just { width = min 600 model.size.width, height = min 500 model.size.height })
-                            -- use the live-updated model
-                            { dm | model = model.trackedRequests }
+                    JobsDialog dm _ ->
+                        if model.mobile then
+                            E.layout [] <|
+                                E.map JobsDialogMsg <|
+                                    GD.dialogView Nothing { dm | model = model.jobs }
 
-            _ ->
-                E.layout
-                    ([ EF.size model.stylePalette.fontSize, E.width E.fill ]
-                        ++ dndif
-                    )
-                <|
-                    viewState model.size model.state model
-        ]
+                        else
+                            Html.map JobsDialogMsg <|
+                                GD.layout
+                                    (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                    { dm | model = model.jobs }
+
+                    MdInlineXform gdm _ ->
+                        if model.mobile then
+                            E.layout [] <|
+                                E.map MdInlineXformMsg <|
+                                    GD.dialogView Nothing gdm
+
+                        else
+                            Html.map MdInlineXformMsg <|
+                                GD.layout
+                                    (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                    gdm
+
+                    RequestsDialog dm _ ->
+                        if model.mobile then
+                            E.layout [] <|
+                                E.map RequestsDialogMsg <|
+                                    GD.dialogView Nothing { dm | model = model.trackedRequests }
+
+                        else
+                            Html.map RequestsDialogMsg <|
+                                GD.layout
+                                    (Just { width = min 600 model.size.width, height = min 500 model.size.height })
+                                    -- use the live-updated model
+                                    { dm | model = model.trackedRequests }
+
+                    _ ->
+                        E.layout
+                            ([ EF.size model.stylePalette.fontSize, E.width E.fill ]
+                                ++ dndif
+                            )
+                        <|
+                            viewState model.size model.state model
+               ]
     }
 
 
@@ -2201,10 +2278,10 @@ actualupdate msg model =
             ( nmd, cmd )
 
         ( ReceiveLocalVal lv, _ ) ->
-            case model.localValAction of
+            case Dict.get lv.name model.localValAction of
                 Just (LocalValAction lva) ->
                     if lv.for == lva.for && lv.name == lva.name then
-                        lva.action lv.value
+                        lva.action { model | localValAction = Dict.remove lv.name model.localValAction } lv.value
 
                     else
                         ( model, Cmd.none )
@@ -2230,6 +2307,69 @@ actualupdate msg model =
 
                         Nothing ->
                             actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
+
+                Err e ->
+                    ( displayMessageDialog model <| JD.errorToString e ++ "\n" ++ JE.encode 2 jd
+                    , Cmd.none
+                    )
+
+        ( ReceiveSocketMsg jd, _ ) ->
+            case JD.decodeValue WebSocket.decodeMsg jd of
+                Ok (WebSocket.OnError wsm) ->
+                    ( { model | socketState = Just <| SsError }
+                    , Cmd.none
+                    )
+
+                Ok (WebSocket.OnClose wsm) ->
+                    ( { model | socketState = Just <| SsIsClosed wsm.code }
+                    , case wsm.code of
+                        WebSocket.PolicyViolation ->
+                            -- don't keep trying, bad login.
+                            sendSocketCommand
+                                (WebSocket.encodeCmd <|
+                                    WebSocket.Close
+                                        { name = "private"
+                                        }
+                                )
+
+                        _ ->
+                            opensocket model.fui.location
+                    )
+
+                Ok (WebSocket.OnOpen wsm) ->
+                    ( { model | socketState = Just SsIsOpen }
+                    , Cmd.none
+                    )
+
+                Ok (WebSocket.OnData wsm) ->
+                    if wsm.name == "private" then
+                        case JD.decodeString (makeTDDecoder Data.privateClosureReplyDecoder) wsm.data of
+                            Ok td ->
+                                case td.data.closureId of
+                                    Just id ->
+                                        case Dict.get id model.ziClosures of
+                                            Just closure ->
+                                                let
+                                                    cmsg =
+                                                        closure (Ok ( td.utc, td.data.reply ))
+                                                in
+                                                actualupdate cmsg model
+
+                                            Nothing ->
+                                                actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
+
+                                    Nothing ->
+                                        actualupdate (ZkReplyData (Ok ( td.utc, td.data.reply ))) model
+
+                            Err e ->
+                                ( displayMessageDialog model <| JD.errorToString e ++ "\n" ++ JE.encode 2 jd
+                                , Cmd.none
+                                )
+
+                    else
+                        ( displayMessageDialog model <| "unknown websocket connection - \"" ++ wsm.name ++ "\""
+                        , Cmd.none
+                        )
 
                 Err e ->
                     ( displayMessageDialog model <| JD.errorToString e ++ "\n" ++ JE.encode 2 jd
@@ -2722,7 +2862,7 @@ actualupdate msg model =
                         Data.PbyZkNoteAndLinks znl ->
                             let
                                 action =
-                                    \mbstate ->
+                                    \amodel mbstate ->
                                         let
                                             znas =
                                                 { znal = znl, mbstate = mbstate }
@@ -2743,21 +2883,21 @@ actualupdate msg model =
                                             ngets =
                                                 makePubNoteCacheGets model znl.zknote.content
                                         in
-                                        ( { model | state = vstate }
+                                        ( { amodel | state = vstate }
                                         , Cmd.batch ngets
                                         )
 
                                 lid =
                                     SNG.localDataId znl.zknote.id
                             in
-                            ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = action } }
+                            ( { model | localValAction = Dict.insert lid (LocalValAction { for = "lva", name = lid, action = action }) model.localValAction }
                             , LS.getLocalVal { for = "lva", name = lid }
                             )
 
                         Data.PbyZkNoteAndLinksWhat znlw ->
                             let
                                 action =
-                                    \mbstate ->
+                                    \amodel mbstate ->
                                         let
                                             znas : DataUtil.ZkNoteAndStateWhat
                                             znas =
@@ -2765,12 +2905,12 @@ actualupdate msg model =
                                                 , what = znlw.what
                                                 }
                                         in
-                                        onZkNoteStatePbWhat model pt znas
+                                        onZkNoteStatePbWhat amodel pt znas
 
                                 lid =
                                     SNG.localDataId znlw.znl.zknote.id
                             in
-                            ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = action } }
+                            ( { model | localValAction = Dict.insert lid (LocalValAction { for = "lva", name = lid, action = action }) model.localValAction }
                             , LS.getLocalVal { for = "lva", name = lid }
                             )
 
@@ -3255,7 +3395,7 @@ actualupdate msg model =
                         Data.PvyZkNoteAndLinksWhat znew ->
                             let
                                 action =
-                                    \mbstate ->
+                                    \amodel mbstate ->
                                         let
                                             znas : DataUtil.ZkNoteAndStateWhat
                                             znas =
@@ -3263,12 +3403,12 @@ actualupdate msg model =
                                                 , what = znew.what
                                                 }
                                         in
-                                        onZkNoteStateEditWhat model pt znas
+                                        onZkNoteStateEditWhat amodel pt znas
 
                                 lid =
                                     SNG.localDataId znew.znl.zknote.id
                             in
-                            ( { model | localValAction = Just <| LocalValAction { for = "lva", name = lid, action = action } }
+                            ( { model | localValAction = Dict.insert lid (LocalValAction { for = "lva", name = lid, action = action }) model.localValAction }
                             , LS.getLocalVal { for = "lva", name = lid }
                             )
 
@@ -5187,6 +5327,11 @@ initToRoute model route =
                     model.navkey
                     (routeUrl (stateRoute initialstate).route)
             , Just c
+            , if model.fui.websockets then
+                Just <| opensocket model.fui.location
+
+              else
+                Nothing
             ]
     )
 
@@ -5223,6 +5368,7 @@ init flags url key zone fontsize =
                 { location = flags.location
                 , filelocation = flags.filelocation
                 , tauri = flags.tauri
+                , websockets = flags.websockets
                 }
             , navkey = key
             , seed = seed
@@ -5241,12 +5387,18 @@ init flags url key zone fontsize =
             , ziClosures = Dict.empty
             , mobile = flags.mobile
             , spmodel = SP.initModel
-            , localValAction = Nothing
+            , localValAction = Dict.empty
             , zknSearchResult =
                 { notes = []
                 , offset = 0
                 , what = ""
                 }
+            , socketState =
+                if flags.websockets then
+                    Just SsOpenRequested
+
+                else
+                    Nothing
             }
 
         geterrornote =
@@ -5350,6 +5502,7 @@ main =
                     , receiveUITauriResponse TauriUserReplyData
                     , receivePITauriResponse TauriPublicReplyData
                     , receiveTITauriResponse TauriTauriReplyData
+                    , receiveSocketMsg ReceiveSocketMsg
                     ]
                         ++ rdysubs
         , onUrlRequest = urlRequest
@@ -5413,3 +5566,9 @@ port sendKeyCommand : JE.Value -> Cmd msg
 skcommand : WindowKeys.WindowKeyCmd -> Cmd Msg
 skcommand =
     WindowKeys.send sendKeyCommand
+
+
+port receiveSocketMsg : (JD.Value -> msg) -> Sub msg
+
+
+port sendSocketCommand : JE.Value -> Cmd msg

@@ -3199,3 +3199,31 @@ pub fn udpate43(dbfile: &Path) -> Result<(), zkerr::Error> {
   tr.commit()?;
   Ok(())
 }
+
+pub fn udpate44(dbfile: &Path) -> Result<(), zkerr::Error> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let tr = conn.unchecked_transaction()?;
+
+  conn.execute(
+    "CREATE INDEX \"idx_zkarchzknote\" ON \"zkarch\" (\"zknote\")",
+    params![],
+  )?;
+
+  tr.commit()?;
+  Ok(())
+}
+
+pub fn udpate45(dbfile: &Path) -> Result<(), zkerr::Error> {
+  // db connection without foreign key checking.
+  let conn = Connection::open(dbfile)?;
+  let tr = conn.unchecked_transaction()?;
+
+  conn.execute(
+    "CREATE INDEX \"idx_zkarchuuid\" ON \"zkarch\" (\"uuid\")",
+    params![],
+  )?;
+
+  tr.commit()?;
+  Ok(())
+}

@@ -238,9 +238,9 @@ pub fn search_zknotes_stream(
   try_stream! {
     let (sql, args) = build_sql(&conn, user, &search, exclude_notes)?;
 
-
     let mut stmt = conn.prepare(sql.as_str())?;
     let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
+
     yield SyncMessage::from(ZkSearchResultHeader {
       what: search.what,
       resulttype: search.resulttype,

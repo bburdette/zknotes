@@ -9,7 +9,7 @@ zkprotocol = { path = "../zkprotocol" }
 orgauth = { path = "../orgauth/rustlib/" }
 env_logger = "0.11.8"
 # env_logger = { version = "0.11.5", features = ["anstream"] }
-rusqlite = { version = "0.37.0", features = ["bundled"] }
+rusqlite = { version = "0.37.0", features = ["bundled", "trace"] }
 log = "0.4.28"
 actix-web = "4.11.0"
 actix-files = "0.6.7"
@@ -50,3 +50,4 @@ girlboss = {version = "1.0.0-alpha.4", features = ["actix-rt"]}
 nom = "8.0.0"
 # lapin = { version = "3.7.2", default-features = false, features = [ "rustls--ring", "default-runtime" ] }
 lapin = { version = "2.5.5", default-features = true }
+actix-ws = "0.4.0"

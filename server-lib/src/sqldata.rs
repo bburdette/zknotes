@@ -11,8 +11,8 @@ use orgauth::data::{RegistrationData, UserId};
 use orgauth::dbfun::user_id;
 use orgauth::endpoints::Callbacks;
 use orgauth::util::now;
-use rusqlite::Row;
 use rusqlite::{params, Connection};
+use rusqlite::{OpenFlags, Row};
 use serde_derive::{Deserialize, Serialize};
 use simple_error::bail;
 use std::iter::FromIterator;
@@ -169,8 +169,37 @@ pub fn set_homenote(
   Ok(())
 }
 
-pub fn connection_open(dbfile: &Path) -> Result<Connection, zkerr::Error> {
-  let conn = Connection::open(dbfile)?;
+fn sqlog(meh: &str) {
+  info!("sqlog: {}", meh);
+}
+
+const SQLITE_TRACING: bool = false;
+
+pub enum ConnFig {
+  ReadWrite,
+  ReadOnly,
+}
+
+pub fn connection_open(
+  _connid: &str,
+  conn_fig: ConnFig,
+  dbfile: &Path,
+) -> Result<Connection, zkerr::Error> {
+  let mut conn = match conn_fig {
+    ConnFig::ReadOnly => {
+      let c = Connection::open_with_flags(
+        dbfile,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+          | OpenFlags::SQLITE_OPEN_NO_MUTEX
+          | OpenFlags::SQLITE_OPEN_URI, // OpenFlags::SQLITE_OPEN_READ_ONLY
+                                        //   | OpenFlags::SQLITE_OPEN_CREATE
+                                        //   | OpenFlags::SQLITE_OPEN_URI
+                                        //   | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+      )?;
+      c
+    }
+    ConnFig::ReadWrite => Connection::open(dbfile)?,
+  };
 
   // conn.busy_timeout(Duration::from_millis(500))?;
   conn.busy_handler(Some(|count| {
@@ -179,6 +208,11 @@ pub fn connection_open(dbfile: &Path) -> Result<Connection, zkerr::Error> {
     std::thread::sleep(d);
     true
   }))?;
+
+  if SQLITE_TRACING {
+    #[allow(deprecated)]
+    conn.trace(Some(sqlog));
+  }
 
   conn.execute("PRAGMA foreign_keys = true;", params![])?;
 
@@ -240,7 +274,7 @@ pub fn update_single_value(
 pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server, zkerr::Error> {
   let exists = dbfile.exists();
 
-  let conn = connection_open(dbfile)?;
+  let conn = connection_open("dbinit", ConnFig::ReadWrite, dbfile)?;
 
   if !exists {
     info!("initialdb");
@@ -473,6 +507,16 @@ pub fn dbinit(dbfile: &Path, token_expiration_ms: Option<i64>) -> Result<Server,
     info!("udpate43");
     zkm::udpate43(&dbfile)?;
     set_single_value(&conn, "migration_level", "43")?;
+  }
+  if nlevel < 44 {
+    info!("udpate44");
+    zkm::udpate44(&dbfile)?;
+    set_single_value(&conn, "migration_level", "44")?;
+  }
+  if nlevel < 45 {
+    info!("udpate45");
+    zkm::udpate45(&dbfile)?;
+    set_single_value(&conn, "migration_level", "45")?;
   }
 
   info!("db up to date.");
@@ -928,11 +972,14 @@ pub struct LapinInfo {
 
 pub async fn make_lapin_info(
   conn: Option<&lapin::Connection>,
-  token: Option<String>,
+  token: &Option<String>,
 ) -> Option<LapinInfo> {
   match (conn, token) {
     (Some(conn), Some(token)) => match make_lapin_channels(conn).await {
-      Ok(lc) => Some(LapinInfo { channel: lc, token }),
+      Ok(lc) => Some(LapinInfo {
+        channel: lc,
+        token: token.clone(),
+      }),
       Err(e) => {
         error!("{e}");
         None
@@ -1741,12 +1788,10 @@ pub fn delete_zknote(
 }
 
 pub fn save_zklinks(
-  dbfile: &Path,
+  conn: &Connection,
   uid: UserId,
   zklinks: &Vec<SaveZkLink2>,
 ) -> Result<(), zkerr::Error> {
-  let conn = connection_open(dbfile)?;
-
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.
     let to = note_id_for_zknoteid(&conn, &zklink.to)?;
@@ -1834,19 +1879,17 @@ pub fn save_savelzlinks(
     if link.delete == Some(true) {
       // create archive record.
       let now = now()?;
-      let ac = conn.execute(
+      let _ac = conn.execute(
         "insert into zklinkarchive (fromid, toid, user, linkzknote, createdate, deletedate)
             select fromid, toid, user, linkzknote, createdate, ?1 from zklink
             where fromid = ?2 and toid = ?3 and user = ?4",
         params![now, from, to, uid.to_i64()],
       )?;
-      println!("inserted {} archive lzlink", ac);
       // delete the link.
-      let dc = conn.execute(
+      let _dc = conn.execute(
         "delete from zklink where fromid = ?1 and toid = ?2 and user = ?3",
         params![from, to, uid.to_i64()],
       )?;
-      println!("deleted {} lzlink", dc);
     } else {
       save_zklink(&conn, from, to, uid, Some(linkzknote))?;
     }
