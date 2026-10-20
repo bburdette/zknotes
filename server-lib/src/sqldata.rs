@@ -181,7 +181,6 @@ pub fn connection_open(
   dbfile: &Path,
 ) -> Result<Connection, zkerr::Error> {
   let mut conn = if read_only {
-    info!("beefore");
     let c = Connection::open_with_flags(
       dbfile,
       OpenFlags::SQLITE_OPEN_READ_ONLY
@@ -191,7 +190,6 @@ pub fn connection_open(
                                       //   | OpenFlags::SQLITE_OPEN_URI
                                       //   | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
-    info!("eefter");
     c
   } else {
     Connection::open(dbfile)?
