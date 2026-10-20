@@ -324,7 +324,8 @@ pub async fn zk_interface_loggedin(
       }
     }
     PrivateRequest::PvqPowerDelete(search) => {
-      conn.close();
+      conn.close().map_err(|e| e.1)?;
+
       let conn = sqldata::connection_open(
         "PvqPowerDelete",
         false,
@@ -334,7 +335,8 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvyPowerDeleteComplete(res))
     }
     PrivateRequest::PvqDeleteZkNote(id) => {
-      conn.close();
+      conn.close().map_err(|e| e.1)?;
+
       let conn = sqldata::connection_open(
         "PvqPowerDelete",
         false,
@@ -344,7 +346,8 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvyDeletedZkNote(id.clone()))
     }
     PrivateRequest::PvqSaveZkNote(sbe) => {
-      conn.close();
+      conn.close().map_err(|e| e.1)?;
+
       let conn = sqldata::connection_open(
         "PvqPowerDelete",
         false,
@@ -355,7 +358,8 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedZkNote(s))
     }
     PrivateRequest::PvqSaveZkLinks(msg) => {
-      conn.close();
+      conn.close().map_err(|e| e.1)?;
+
       let conn = sqldata::connection_open(
         "PvqPowerDelete",
         false,
@@ -365,7 +369,8 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedZkLinks)
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
-      conn.close();
+      conn.close().map_err(|e| e.1)?;
+
       let conn = sqldata::connection_open(
         "PvqPowerDelete",
         false,
@@ -379,7 +384,8 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }
     PrivateRequest::PvqSaveImportZkNotes(gzl) => {
-      conn.close();
+      conn.close().map_err(|e| e.1)?;
+
       let conn = sqldata::connection_open(
         "PvqPowerDelete",
         false,
@@ -390,7 +396,7 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedImportZkNotes)
     }
     PrivateRequest::PvqSetHomeNote(hn) => {
-      conn.close();
+      conn.close().map_err(|e| e.1)?;
       let conn = sqldata::connection_open(
         "PvqPowerDelete",
         false,
@@ -400,7 +406,7 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvyHomeNoteSet(hn.clone()))
     }
     PrivateRequest::PvqSyncRemote => {
-      conn.close();
+      conn.close().map_err(|e| e.1)?;
       let conn = sqldata::connection_open(
         "PvqPowerDelete",
         false,
