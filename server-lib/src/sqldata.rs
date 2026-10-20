@@ -1783,7 +1783,6 @@ pub fn delete_zknote(
 
 pub fn save_zklinks(
   conn: &Connection,
-  dbfile: &Path,
   uid: UserId,
   zklinks: &Vec<SaveZkLink2>,
 ) -> Result<(), zkerr::Error> {

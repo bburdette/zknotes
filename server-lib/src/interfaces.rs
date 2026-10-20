@@ -361,12 +361,7 @@ pub async fn zk_interface_loggedin(
         false,
         state.config.orgauth_config.db.as_path(),
       )?;
-      let _ = sqldata::save_zklinks(
-        &conn,
-        &state.config.orgauth_config.db.as_path(),
-        uid,
-        &msg.links,
-      )?;
+      let _ = sqldata::save_zklinks(&conn, uid, &msg.links)?;
       Ok(PrivateReply::PvySavedZkLinks)
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
