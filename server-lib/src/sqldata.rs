@@ -1782,12 +1782,11 @@ pub fn delete_zknote(
 }
 
 pub fn save_zklinks(
+  conn: &Connection,
   dbfile: &Path,
   uid: UserId,
   zklinks: &Vec<SaveZkLink2>,
 ) -> Result<(), zkerr::Error> {
-  let conn = connection_open("save_zklinks", false, dbfile)?;
-
   for zklink in zklinks.iter() {
     // TODO: integrate into sql instead of separate queries.
     let to = note_id_for_zknoteid(&conn, &zklink.to)?;

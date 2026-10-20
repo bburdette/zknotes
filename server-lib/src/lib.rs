@@ -678,7 +678,7 @@ async fn private_upstreaming(
   match zk_interface_check_upstreaming(&session, &data.config, &li, body).await {
     Ok(hr) => hr,
     Err(e) => {
-      error!("'private' err: {:?}", e);
+      error!("'private_upstreaming' err: {:?}", e);
       let se = PrivateReply::PvyServerError(PrivateError::PveString(e.to_string()));
       HttpResponse::Ok().json(se)
     }

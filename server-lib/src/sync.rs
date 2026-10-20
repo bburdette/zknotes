@@ -1483,7 +1483,7 @@ pub async fn sync_to_remote(
     .cookie(cookie)
     .timeout(Duration::from_secs(60 * 60))
     .send_body(awc::body::BodyStream::new(ss))
-    .map_err(|e| zkerr::Error::String(e.to_string()))
+    .map_err(|e| zkerr::Error::String(format!("sync_to_remote send_body err {}", e.to_string())))
     .await?;
 
   // TODO: send back Sync results... how many records and etc.
