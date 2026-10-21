@@ -249,7 +249,7 @@ pub async fn zk_interface_loggedin_streaming(
 
 pub async fn zk_interface_loggedin(
   state: &State,
-  conn: Connection, // assumed to be ConnFig::ReadOnly
+  conn: Connection,
   token: &Option<String>,
   uid: UserId,
   msg: &PrivateRequest,
@@ -325,53 +325,53 @@ pub async fn zk_interface_loggedin(
       }
     }
     PrivateRequest::PvqPowerDelete(search) => {
-      conn.close().map_err(|e| e.1)?;
-      let conn = sqldata::connection_open(
-        "PvqPowerDelete",
-        ConnFig::ReadWrite,
-        state.config.orgauth_config.db.as_path(),
-      )?;
+      // conn.close().map_err(|e| e.1)?;
+      // let conn = sqldata::connection_open(
+      //   "PvqPowerDelete",
+      //   ConnFig::ReadWrite,
+      //   state.config.orgauth_config.db.as_path(),
+      // )?;
       let res = search::power_delete_zknotes(&conn, state.config.file_path.clone(), uid, &search)?;
       Ok(PrivateReply::PvyPowerDeleteComplete(res))
     }
     PrivateRequest::PvqDeleteZkNote(id) => {
-      conn.close().map_err(|e| e.1)?;
-      let conn = sqldata::connection_open(
-        "PvqDeleteZkNote",
-        ConnFig::ReadWrite,
-        state.config.orgauth_config.db.as_path(),
-      )?;
+      // conn.close().map_err(|e| e.1)?;
+      // let conn = sqldata::connection_open(
+      //   "PvqDeleteZkNote",
+      //   ConnFig::ReadWrite,
+      //   state.config.orgauth_config.db.as_path(),
+      // )?;
       sqldata::delete_zknote(&conn, state.config.file_path.clone(), uid, &id)?;
       Ok(PrivateReply::PvyDeletedZkNote(id.clone()))
     }
     PrivateRequest::PvqSaveZkNote(sbe) => {
-      conn.close().map_err(|e| e.1)?;
-      let conn = sqldata::connection_open(
-        "PvqSaveZkNote",
-        ConnFig::ReadWrite,
-        state.config.orgauth_config.db.as_path(),
-      )?;
+      // conn.close().map_err(|e| e.1)?;
+      // let conn = sqldata::connection_open(
+      //   "PvqSaveZkNote",
+      //   ConnFig::ReadWrite,
+      //   state.config.orgauth_config.db.as_path(),
+      // )?;
       let li = connect_and_make_lapin_info(state, token).await;
       let (_id, s) = sqldata::save_zknote(&conn, &li, &state.server, uid, &sbe, None).await?;
       Ok(PrivateReply::PvySavedZkNote(s))
     }
     PrivateRequest::PvqSaveZkLinks(msg) => {
-      conn.close().map_err(|e| e.1)?;
-      let conn = sqldata::connection_open(
-        "PvqSaveZkLinks",
-        ConnFig::ReadWrite,
-        state.config.orgauth_config.db.as_path(),
-      )?;
+      // conn.close().map_err(|e| e.1)?;
+      // let conn = sqldata::connection_open(
+      //   "PvqSaveZkLinks",
+      //   ConnFig::ReadWrite,
+      //   state.config.orgauth_config.db.as_path(),
+      // )?;
       let _ = sqldata::save_zklinks(&conn, uid, &msg.links)?;
       Ok(PrivateReply::PvySavedZkLinks)
     }
     PrivateRequest::PvqSaveZkNoteAndLinks(sznpl) => {
-      conn.close().map_err(|e| e.1)?;
-      let conn = sqldata::connection_open(
-        "PvqSaveZkNoteAndLinks",
-        ConnFig::ReadWrite,
-        state.config.orgauth_config.db.as_path(),
-      )?;
+      // conn.close().map_err(|e| e.1)?;
+      // let conn = sqldata::connection_open(
+      //   "PvqSaveZkNoteAndLinks",
+      //   ConnFig::ReadWrite,
+      //   state.config.orgauth_config.db.as_path(),
+      // )?;
       let li = connect_and_make_lapin_info(state, token).await;
       let (_, szkn) =
         sqldata::save_zknote(&conn, &li, &state.server, uid, &sznpl.note, None).await?;
@@ -380,33 +380,33 @@ pub async fn zk_interface_loggedin(
       Ok(PrivateReply::PvySavedZkNoteAndLinks(szkn))
     }
     PrivateRequest::PvqSaveImportZkNotes(gzl) => {
-      conn.close().map_err(|e| e.1)?;
-      let conn = sqldata::connection_open(
-        "PvqPowerDelete",
-        ConnFig::ReadWrite,
-        state.config.orgauth_config.db.as_path(),
-      )?;
+      // conn.close().map_err(|e| e.1)?;
+      // let conn = sqldata::connection_open(
+      //   "PvqPowerDelete",
+      //   ConnFig::ReadWrite,
+      //   state.config.orgauth_config.db.as_path(),
+      // )?;
       let li = connect_and_make_lapin_info(state, token).await;
       sqldata::save_importzknotes(&conn, &li, &state.server, uid, gzl).await?;
       Ok(PrivateReply::PvySavedImportZkNotes)
     }
     PrivateRequest::PvqSetHomeNote(hn) => {
-      conn.close().map_err(|e| e.1)?;
-      let conn = sqldata::connection_open(
-        "PvqPowerDelete",
-        ConnFig::ReadWrite,
-        state.config.orgauth_config.db.as_path(),
-      )?;
+      // conn.close().map_err(|e| e.1)?;
+      // let conn = sqldata::connection_open(
+      //   "PvqPowerDelete",
+      //   ConnFig::ReadWrite,
+      //   state.config.orgauth_config.db.as_path(),
+      // )?;
       sqldata::set_homenote(&conn, uid, hn)?;
       Ok(PrivateReply::PvyHomeNoteSet(hn.clone()))
     }
     PrivateRequest::PvqSyncRemote => {
-      conn.close().map_err(|e| e.1)?;
-      let conn = sqldata::connection_open(
-        "PvqPowerDelete",
-        ConnFig::ReadWrite,
-        state.config.orgauth_config.db.as_path(),
-      )?;
+      // conn.close().map_err(|e| e.1)?;
+      // let conn = sqldata::connection_open(
+      //   "PvqPowerDelete",
+      //   ConnFig::ReadWrite,
+      //   state.config.orgauth_config.db.as_path(),
+      // )?;
       let dbpath: PathBuf = state.config.orgauth_config.db.to_path_buf();
       let file_path: PathBuf = state.config.file_path.to_path_buf();
       let uid: UserId = uid;
@@ -417,7 +417,7 @@ pub async fn zk_interface_loggedin(
       let lapin_channelx = li.map(|li| li.channel).clone();
       let token = token.clone();
 
-      // not really necessary.  trying to ensure no sqlite blocking.
+      // trying to reduce sqlite blocking.
       conn.close().map_err(|(_conn, err)| err)?;
 
       std::thread::spawn(move || {
