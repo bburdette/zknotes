@@ -113,7 +113,7 @@ type Msg
     | OnPubidChanged String
     | SavePress
     | RevertPress
-    | DeletePress ZC.StylePalette Time.Zone
+    | DeletePress (ZC.StylePalette Msg) Time.Zone
     | ViewPress
     | NewPress
     | UploadPress
@@ -1103,7 +1103,7 @@ showPageLink model pl =
 
 
 view :
-    ZC.StylePalette
+    ZC.StylePalette Msg
     -> Time.Zone
     -> Util.Size
     -> SP.Model
@@ -1551,7 +1551,7 @@ renderBlocks mobile zone fui cd noteCache vm mdw isdirty mbblockedit mbinfo drop
 
 
 controlRow :
-    ZC.StylePalette
+    ZC.StylePalette Msg
     -> Bool
     -> Model
     -> ZkNoteId
@@ -1659,7 +1659,7 @@ controlRow stylePalette isDirty model zknid =
 
 
 zknview :
-    ZC.StylePalette
+    ZC.StylePalette Msg
     -> Time.Zone
     -> Util.Size
     -> SP.Model

@@ -378,7 +378,7 @@ showZkl focusLink ld sysColor showflip zkl =
 
 
 view :
-    ZC.StylePalette
+    ZC.StylePalette a
     -> List Data.ZkListNote
     -> Maybe Util.Size
     -> SP.Model

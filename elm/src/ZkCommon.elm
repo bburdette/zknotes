@@ -13,7 +13,53 @@ import Util as U
 type alias StylePalette =
     { defaultSpacing : Int
     , fontSize : Int
+    , pageBackgroundColor : E.Color
+    , navAreaBackGroundColor : E.Color
+    , buttonFace : E.Color
+    , buttonFontColor : E.Color
+    , buttonBorderColor : E.Color
+    , disabledButtonBackgroundColor : E.Color
+    , linkColor : E.Color
     }
+
+
+buttonStyle : StylePalette -> List (E.Attribute msg)
+buttonStyle sp =
+    [ EBk.color sp.buttonFace
+    , EF.color sp.buttonFontColor
+    , EBd.color sp.buttonBorderColor
+    , E.paddingXY 10 5
+    , EBd.rounded 3
+    ]
+
+
+disabledButtonStyle : StylePalette -> List (E.Attribute msg)
+disabledButtonStyle sp =
+    buttonStyle sp ++ [ EBk.color sp.disabledButtonBackgroundColor ]
+
+
+linkStyle : StylePalette -> List (E.Attribute msg)
+linkStyle sp =
+    [ EF.color sp.linkColor, EF.underline ]
+
+
+menuBlue =
+    { r = 52.0 / 255.0
+    , g = 101.0 / 255.0
+    , b = 164.0 / 255.0
+    }
+
+
+navbarColor : E.Color -> Int -> E.Color
+navbarColor nbcolor level =
+    let
+        nbc =
+            E.toRgb nbcolor
+
+        cf =
+            \num -> 1.0 - ((0.6 ^ toFloat level) * (1.0 - num))
+    in
+    E.rgb (cf nbc.red) (cf nbc.green) (cf nbc.blue)
 
 
 

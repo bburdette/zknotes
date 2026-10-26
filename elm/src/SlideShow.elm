@@ -148,7 +148,7 @@ init fui nc mbparent mbcurrent mbstate nl rnlls =
     )
 
 
-view : StylePalette -> Time.Zone -> Int -> NoteCache -> Model -> E.Element Msg
+view : StylePalette a -> Time.Zone -> Int -> NoteCache -> Model -> E.Element Msg
 view sp tz maxw nc model =
     E.column []
         [ E.row [ E.spacing 3 ]

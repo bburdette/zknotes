@@ -240,7 +240,7 @@ opensocket location =
         )
 
 
-type alias Model =
+type alias Model a =
     { state : State
     , size : Util.Size
     , fui : FileUrlInfo
@@ -252,7 +252,7 @@ type alias Model =
     , prevSearches : List (List Data.TagSearch)
     , recentNotes : List Data.ZkListNote
     , errorNotes : Dict String String
-    , stylePalette : StylePalette
+    , stylePalette : StylePalette a
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
     , jobs : TJobs
@@ -1086,7 +1086,7 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view model.stylePalette model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
+            E.map EditZkNoteMsg <| EditZkNote.view (E.map (\_ -> EditZkNote.Noop) model.stylePalette) model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.stylePalette.fontSize ld size em model.spmodel model.zknSearchResult
