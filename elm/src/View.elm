@@ -128,7 +128,7 @@ showZkl zkl =
         ]
 
 
-view : ZC.StylePalette a -> Time.Zone -> Int -> NoteCache -> Config -> Model -> Element Msg
+view : ZC.StylePalette -> Time.Zone -> Int -> NoteCache -> Config -> Model -> Element Msg
 view stylePalette zone maxw noteCache config model =
     let
         mw =

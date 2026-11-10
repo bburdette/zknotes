@@ -158,7 +158,7 @@ showSr fontsize model lastSelected zlnNotes controlRow zkln =
 
 
 view :
-    ZC.StylePalette a
+    ZC.StylePalette
     -> Maybe Util.Size
     -> List Data.ZkListNote
     -> SSP.Model
@@ -182,7 +182,7 @@ type alias Views tmsg =
 
 
 makeViews :
-    ZC.StylePalette a
+    ZC.StylePalette
     -> Maybe Util.Size
     -> List Data.ZkListNote
     -> SSP.Model

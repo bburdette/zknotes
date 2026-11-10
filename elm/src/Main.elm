@@ -68,7 +68,7 @@ import Util exposing (andMap)
 import View
 import WebSocket
 import WindowKeys
-import ZkCommon exposing (StylePalette)
+import ZkCommon exposing (StylePalette, defaultStyle)
 
 
 type Msg
@@ -240,7 +240,7 @@ opensocket location =
         )
 
 
-type alias Model a =
+type alias Model =
     { state : State
     , size : Util.Size
     , fui : FileUrlInfo
@@ -252,7 +252,7 @@ type alias Model a =
     , prevSearches : List (List Data.TagSearch)
     , recentNotes : List Data.ZkListNote
     , errorNotes : Dict String String
-    , stylePalette : StylePalette a
+    , stylePalette : StylePalette
     , adminSettings : OD.AdminSettings
     , trackedRequests : TRequests
     , jobs : TJobs
@@ -1086,7 +1086,7 @@ viewState size state model =
             E.map InvitedMsg <| Invited.view model.stylePalette size em
 
         EditZkNote em _ ->
-            E.map EditZkNoteMsg <| EditZkNote.view (E.map (\_ -> EditZkNote.Noop) model.stylePalette) model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
+            E.map EditZkNoteMsg <| EditZkNote.view model.stylePalette model.timezone size model.spmodel model.zknSearchResult model.recentNotes model.trackedRequests model.jobs model.noteCache em
 
         EditZkNoteListing em ld ->
             E.map EditZkNoteListingMsg <| EditZkNoteListing.view model.stylePalette.fontSize ld size em model.spmodel model.zknSearchResult
@@ -5378,7 +5378,7 @@ init flags url key zone fontsize =
             , prevSearches = []
             , recentNotes = []
             , errorNotes = Dict.empty
-            , stylePalette = { defaultSpacing = 10, fontSize = fontsize }
+            , stylePalette = defaultStyle fontsize
             , adminSettings = flags.adminsettings
             , trackedRequests = { requestCount = 0, mobile = flags.mobile, requests = Dict.empty }
             , jobs = { mobile = flags.mobile, jobs = Dict.empty }

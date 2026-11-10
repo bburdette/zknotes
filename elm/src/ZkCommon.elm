@@ -23,6 +23,20 @@ type alias StylePalette =
     }
 
 
+defaultStyle : Int -> StylePalette
+defaultStyle fontsize =
+    { defaultSpacing = 10
+    , fontSize = fontsize
+    , pageBackgroundColor = TC.lightOrange
+    , navAreaBackGroundColor = E.rgb menuBlue.r menuBlue.g menuBlue.b
+    , buttonFace = TC.blue
+    , buttonFontColor = TC.white
+    , buttonBorderColor = TC.darkBlue
+    , disabledButtonBackgroundColor = TC.grey
+    , linkColor = myLinkColor
+    }
+
+
 buttonStyle : StylePalette -> List (E.Attribute msg)
 buttonStyle sp =
     [ EBk.color sp.buttonFace
