@@ -1083,8 +1083,7 @@ codeSpan snippet =
 codeBlock : { body : String, language : Maybe String } -> Element msg
 codeBlock details =
     E.el
-        [ E.padding 5
-        , EF.family [ EF.monospace ]
+        [ EF.family [ EF.monospace ]
         , E.width E.fill
         ]
         (E.html <|
@@ -1097,6 +1096,7 @@ codeBlock details =
                 -- Use these for horizontal scroll when narrow. --
                 , HA.style "overflow" "auto clip"
                 , HA.style "contain" "inline-size"
+                , HA.style "padding" "10px"
                 ]
                 [ SyntaxHighlight.useTheme SyntaxHighlight.oneDark
                 , SyntaxMd.showLang details.body details.language
