@@ -3231,7 +3231,9 @@ onWkKeyPress noteCache key model =
 
         Toop.T4 "Escape" False False False ->
             -- close blockedit, cancel changes.
-            ( { model | blockEdit = Nothing }, None )
+            -- ( { model | blockEdit = Nothing }, None )
+            -- Actually I hate that.  Do nothing instead
+            ( model, None )
 
         _ ->
             ( model, None )
