@@ -1,6 +1,6 @@
 ip = '0.0.0.0'
 port = 8010
-createdirs = false
+createdirs = true
 altmainsite = [ 'http://localhost:8010']
 file_tmp_path = './temp'
 file_path = './files'
