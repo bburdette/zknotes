@@ -1,0 +1,1 @@
+cat meh.txt | grep Some\(.*\) -o | grep \".*\" -o | sort | uniq -c | sed s/\"//g | sort -h | while read line; do echo $line; geoiplookup $(echo $line | cut -f2 -w ) ; done
